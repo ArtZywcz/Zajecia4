@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Nancy.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -29,10 +33,94 @@ namespace Zajecia4
             public DbSet<Team> Teams { get; set; }
         }
 
+        public static List<data> getData(string api)
+        {
+            HttpWebRequest WebReq = (HttpWebRequest)WebRequest.Create(string.Format(api));
+
+            WebReq.Method = "GET";
+
+            HttpWebResponse WebResp = (HttpWebResponse)WebReq.GetResponse();
+
+            string jsonString;
+            using (Stream stream = WebResp.GetResponseStream())
+            {
+                StreamReader reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+                jsonString = reader.ReadToEnd();
+            }
+            List<data> items = JsonConvert.DeserializeObject<List<data>>(jsonString);
+            return items;
+        }
         static void Main(string[] args)
         {
+            var stopwatch = new Stopwatch();
+
+            var google = new Website("https://google.pl");
+            var ath = new Website("https://ath.bielsko.pl");
+            var fb = new Website("https://facebook.com");
+            var wiki = new Website("https://en.wikipedia.org");
+            var anyapi = new Website("https://anyapi.com");
+            var plany = new Website("https://plany.ath.bielsko.pl");
+
+            var tasks = new List<Task<IRestResponse>>();
+
+            stopwatch.Start();
+
+            tasks.Add(google.DownloadAsync("/"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(ath.DownloadAsync("/"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(fb.DownloadAsync("/"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(wiki.DownloadAsync("/wiki/.NET_Core"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(anyapi.DownloadAsync("/wiki/.NET_Core"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(plany.DownloadAsync("/plan.php?type=0&id=12647"));
+            Console.WriteLine(stopwatch.Elapsed);
+            tasks.Add(ath.DownloadAsync("/graficzne-formy-przekazu-informacji/"));
+            Console.WriteLine(stopwatch.Elapsed);
+
+            Console.WriteLine("----------------------------");
+            Console.WriteLine(stopwatch.Elapsed);
+            var htmlCodes = Task.WhenAll(tasks).Result;
+            foreach (var site in htmlCodes)
+            {
+                Console.WriteLine(site.Content);
+            }
+            Console.WriteLine(stopwatch.Elapsed);
             
 
+            Console.WriteLine(google.DownloadAsync("/").Result);
+            Console.WriteLine(stopwatch.Elapsed);
+            stopwatch.Stop();
+
+            //football api v2
+
+            List<data> test = getData("https://api.collegefootballdata.com/teams/");
+            List<data> test2 = getData("https://api.collegefootballdata.com/records?year=2019");
+            int xa = 0;
+            for (int ia = 0; ia < test.Count; ia++)
+            {
+                if (test[ia].school == test2[xa].team)
+                {
+
+                    using (var db2 = new TeamContext())
+                    {
+                        Team x = new Team
+                        {
+                            teamId = test[ia].id,
+                            teamName = test[ia].school,
+                            teamMascot = test[ia].mascot,
+                            games = test2[xa].total.games
+                        };
+                        db2.Teams.Add(x);
+                        db2.SaveChanges();
+                    }
+                }
+
+            }
+
+            /*//FOOTBALL API
             var client = new RestClient("https://api.collegefootballdata.com/teams/"); //pobranie strony z druzynami
             var request = new RestRequest("/");
             var respose = client.Get(request);
@@ -96,7 +184,7 @@ namespace Zajecia4
 
 
                 }
-            }
+            }*/
         }
     }  
 
